@@ -174,6 +174,7 @@ end
 function layout:add(layout)
     self.cursor = self.cursor + 1
     table.insert(self.layouts, layout)
+    layout:setFocus()
 end
 
 function layout:replace(layout)
@@ -181,18 +182,21 @@ function layout:replace(layout)
     self.parentName = layout.parent.name
 
     local idx = self.parent:matchingLayout(layout)
-    layout.parent.cursor = idx - 1
+    layout.parent.cursor = idx
     layout.parent.layouts[idx] = self
     layout.parent.layouts[idx].scale = layout.scale
+    self:setFocus()
 end
 
 function layout:remove(layout)
     local idx = self:matchingLayout(layout)
 
     table.remove(self.layouts, idx)
-    self.cursor = idx - 1
+    self.cursor = math.max(idx - 1, 0)
     if self.parent then
-        if #self.layouts == 1 then
+        if #self.layouts > 1 then
+            self.layouts[self.cursor]:setFocus()
+        elseif #self.layouts == 1 then
             self.layouts[1]:replace(self)
             self:draw()
         elseif #self.layouts == 0 then
@@ -204,11 +208,17 @@ function layout:remove(layout)
     end
 end
 
-function layout:setFocus(layout)
-    self.cursor = self:matchingLayout(layout)
+-- focus
+
+function layout:setFocus()
     if self.parent then
-        self.parent:setFocus(self)
+        self.parent:focusChild(self)
+        self.parent:setFocus()
     end
+end
+
+function layout:focusChild(layout)
+    self.cursor = self:matchingLayout(layout)
 end
 
 -- window handlers
