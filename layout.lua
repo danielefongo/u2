@@ -101,12 +101,12 @@ function layout:resize(layout, dimension, ratio)
         end
     end
 
-    self.handler:draw()
+    self:draw()
 end
 
 -- drawing utilities
 
-function layout:drawTiled(screen, axis, dimension)
+function layout:drawTiled(axis, dimension)
     local offset = 0
     for _, l in pairs(self.layouts) do
         local length = (self.unit[dimension] / #self.layouts * l.scale[dimension])
@@ -114,22 +114,22 @@ function layout:drawTiled(screen, axis, dimension)
         l.unit = hs.geometry.copy(self.unit)
         l.unit[axis] = l.unit[axis] + offset
         l.unit[dimension] = length
-        l:draw(screen)
+        l:draw()
 
         offset = offset + length
     end
 end
 
-function layout:draw(screen)
+function layout:draw()
     if self:isLeaf() then
-        self.window:moveToScreen(screen)
+        self.window:moveToScreen(self.screen)
         self.window:moveToUnit(self.unit)
         self.window:raise()
     elseif self:isNode() then
         if self.mode == MODE.horizontal then
-            self:drawTiled(screen, AXIS.x, DIMENSION.width)
+            self:drawTiled(AXIS.x, DIMENSION.width)
         elseif self.mode == MODE.vertical then
-            self:drawTiled(screen, AXIS.y, DIMENSION.height)
+            self:drawTiled(AXIS.y, DIMENSION.height)
         end
     end
 end
@@ -147,7 +147,7 @@ end
 function layout:toNode()
     if self:isLeaf() then
         local win = self.window
-        local leafLayout = layout.leaf(win, self)
+        local leafLayout = layout.leaf(self.screen, win, self)
         leafLayout:generateHandlers(win)
         self.windowFilter:unsubscribeAll()
         self.window = nil
@@ -157,7 +157,7 @@ end
 
 function layout:split(window)
     self:toNode()
-    local newLayout = layout.leaf(window, self)
+    local newLayout = layout.leaf(self.screen, window, self)
     newLayout:generateHandlers(window)
     self:add(newLayout)
 end
@@ -167,7 +167,6 @@ end
 function layout:unlock()
     if self.parent then
         self.parent:remove(self)
-        self.handler:draw()
         self = nil
     end
 end
@@ -195,11 +194,13 @@ function layout:remove(layout)
     if self.parent then
         if #self.layouts == 1 then
             self.layouts[1]:replace(self)
+            self:draw()
         elseif #self.layouts == 0 then
             self.parent:remove(self)
         end
     else
         self.handler:noFocusedLayout()
+        self:draw()
     end
 end
 
@@ -228,14 +229,14 @@ function layout:generateHandlers(window)
     end)
     self.windowFilter:subscribe(wf.windowDestroyed, function()
         self.parent:remove(self)
-        self.handler:draw()
     end)
 end
 
 -- constructors
 
-function layout.empty(handler)
+function layout.empty(screen, handler)
     local l = setmetatable({}, layout)
+    l.screen = screen
     l.cursor = 0
     l.unit = hs.layout.maximized
     l.scale = {
@@ -253,8 +254,9 @@ function layout.empty(handler)
     return l
 end
 
-function layout.leaf(window, parent)
+function layout.leaf(screen, window, parent)
     local l = setmetatable({}, layout)
+    l.screen = screen
     l.cursor = 0
     l.unit = hs.layout.maximized
     l.scale = {

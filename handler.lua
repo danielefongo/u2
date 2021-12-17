@@ -30,11 +30,11 @@ function handler:noFocusedLayout()
 end
 
 function handler:setRoot()
-    self.rootLayout = layout.empty(self)
+    self.rootLayout = layout.empty(self.screen, self)
 end
 
 function handler:draw()
-    self.rootLayout:draw(self.screen)
+    self.rootLayout:draw()
 end
 
 return handler
