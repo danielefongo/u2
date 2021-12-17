@@ -37,4 +37,8 @@ function handler:draw()
     self.rootLayout:draw()
 end
 
+function handler:focus()
+    self.rootLayout:focus()
+end
+
 return handler

@@ -42,6 +42,41 @@ function layout:verticalMode()
     self.mode = MODE.vertical
 end
 
+-- siblings
+
+function layout:leftSibling()
+    if self.parent then
+        return self:searchSibling(MODE.horizontal, -1, self.parent.leftSibling)
+    end
+end
+
+function layout:rightSibling()
+    if self.parent then
+        return self:searchSibling(MODE.horizontal, 1, self.parent.rightSibling)
+    end
+end
+
+function layout:upperSibling()
+    if self.parent then
+        return self:searchSibling(MODE.vertical, -1, self.parent.upperSibling)
+    end
+end
+
+function layout:lowerSibling()
+    if self.parent then
+        return self:searchSibling(MODE.vertical, 1, self.parent.lowerSibling)
+    end
+end
+
+function layout:searchSibling(mode, offset, parentSearchFun)
+    local idx = self.parent:matchingLayout(self)
+    if self.parent.mode == mode and self.parent.layouts[idx + offset] then
+        return self.parent.layouts[idx + offset]
+    else
+        return parentSearchFun(self.parent)
+    end
+end
+
 -- resize utilities
 
 function layout:wider()
@@ -221,6 +256,38 @@ function layout:focusChild(layout)
     self.cursor = self:matchingLayout(layout)
 end
 
+function layout:focus()
+    if self:isLeaf() then
+        self.window:focus()
+    elseif self:isNode() then
+        self.layouts[self.cursor]:focus()
+    end
+end
+
+function layout:focusLeft()
+    self:focusSibling(self.leftSibling)
+end
+
+function layout:focusRight()
+    self:focusSibling(self.rightSibling)
+end
+
+function layout:focusUp()
+    self:focusSibling(self.upperSibling)
+end
+
+function layout:focusDown()
+    self:focusSibling(self.lowerSibling)
+end
+
+function layout:focusSibling(finder)
+    local sibling = finder(self)
+    if sibling then
+        sibling:setFocus()
+        self.handler:focus()
+    end
+end
+
 -- window handlers
 
 function layout:generateHandlers(window)
@@ -233,9 +300,7 @@ function layout:generateHandlers(window)
     end)
     self.windowFilter:subscribe(wf.windowFocused, function()
         self.handler:setFocusedLayout(self)
-        if self.parent then
-            self.parent:setFocus(self)
-        end
+        self:setFocus()
     end)
     self.windowFilter:subscribe(wf.windowDestroyed, function()
         self.parent:remove(self)
