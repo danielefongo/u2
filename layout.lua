@@ -185,7 +185,6 @@ function layout:toNode()
         local win = self.window
         self.windowFilter:unsubscribeAll()
         local leafLayout = layout.leaf(self.screen, win, self)
-        leafLayout:generateHandlers(win)
         self.window = nil
         table.insert(self.layouts, leafLayout)
     end
@@ -194,7 +193,6 @@ end
 function layout:split(window)
     self:toNode()
     local newLayout = layout.leaf(self.screen, window, self)
-    newLayout:generateHandlers(window)
     self:add(newLayout)
 end
 
@@ -397,6 +395,7 @@ function layout.leaf(screen, window, parent)
     l.layouts = {}
     l.window = window
     l.handler:setFocusedLayout(l)
+    l:generateHandlers(window)
     l:horizontalMode()
     return l
 end
