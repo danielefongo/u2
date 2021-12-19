@@ -224,6 +224,34 @@ function layout:replace(layout)
     self:setFocus()
 end
 
+function layout:swap(layout)
+    local selfData = {
+        scale = self.scale,
+        idx = self.parent:matchingLayout(self),
+        parent = self.parent
+    }
+    local layoutData = {
+        scale = layout.scale,
+        idx = layout.parent:matchingLayout(layout),
+        parent = layout.parent
+    }
+
+    self.parent = layoutData.parent
+    layoutData.parent.cursor = layoutData.idx
+    layoutData.parent.layouts[layoutData.idx] = self
+    layoutData.parent.layouts[layoutData.idx].scale = layoutData.scale
+
+    layout.parent = selfData.parent
+    selfData.parent.cursor = selfData.idx
+    selfData.parent.layouts[selfData.idx] = layout
+    selfData.parent.layouts[selfData.idx].scale = selfData.scale
+
+    self:setFocus()
+    layout.parent:draw()
+    self.parent:draw()
+    self.handler:focus()
+end
+
 function layout:remove(layout)
     local idx = self:matchingLayout(layout)
 
@@ -286,6 +314,31 @@ function layout:focusSibling(finder)
     if sibling then
         sibling:setFocus()
         self.handler:focus()
+    end
+end
+
+-- swap
+
+function layout:swapLeft()
+    self:swapSibling(self.leftSibling)
+end
+
+function layout:swapRight()
+    self:swapSibling(self.rightSibling)
+end
+
+function layout:swapUp()
+    self:swapSibling(self.upperSibling)
+end
+
+function layout:swapDown()
+    self:swapSibling(self.lowerSibling)
+end
+
+function layout:swapSibling(finder)
+    local sibling = finder(self)
+    if sibling then
+        self:swap(sibling)
     end
 end
 
