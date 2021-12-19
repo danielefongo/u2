@@ -182,9 +182,9 @@ end
 function layout:toNode()
     if self:isLeaf() then
         local win = self.window
+        self.windowFilter:unsubscribeAll()
         local leafLayout = layout.leaf(self.screen, win, self)
         leafLayout:generateHandlers(win)
-        self.windowFilter:unsubscribeAll()
         self.window = nil
         table.insert(self.layouts, leafLayout)
     end
@@ -319,7 +319,6 @@ function layout.empty(screen, handler)
         [DIMENSION.height] = 1
     }
     l.parent = nil
-    l.parentName = nil
     l.name = uid.next()
     l.handler = handler
     l.layouts = {}
@@ -339,7 +338,6 @@ function layout.leaf(screen, window, parent)
         [DIMENSION.height] = 1
     }
     l.parent = parent
-    l.parentName = parent.name
     l.name = uid.next()
     l.handler = parent.handler
     l.layouts = {}
