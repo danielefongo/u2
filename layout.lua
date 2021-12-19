@@ -137,6 +137,7 @@ function layout:resize(layout, dimension, ratio)
     end
 
     self:draw()
+    self:focus()
 end
 
 -- drawing utilities
