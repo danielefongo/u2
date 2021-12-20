@@ -8,15 +8,10 @@ function handler.new()
     local w = setmetatable({}, handler)
     w.selectedLayout = nil
     w.screen = hs.screen.mainScreen()
-    w.wf = wf.new():subscribe(wf.windowCreated, function(win)
-        if win:isVisible() then
-            if (w.selectedLayout) then
-                w.selectedLayout:split(win)
-            else
-                w.rootLayout:split(win)
-            end
-        end
-        w:draw()
+    w.wf = wf.new(function(win)
+        return win:isStandard() and win:role() ~= "AXScrollArea"
+    end):subscribe(wf.windowCreated, function(win)
+        w:selected():split(win)
     end)
     return w
 end

@@ -136,8 +136,8 @@ function layout:resize(layout, dimension, ratio)
         end
     end
 
-    self:draw()
-    self:focus()
+    self.handler:draw()
+    self.handler:focus()
 end
 
 -- drawing utilities
@@ -147,9 +147,15 @@ function layout:drawTiled(axis, dimension)
     for _, l in pairs(self.layouts) do
         local length = (self.unit[dimension] / #self.layouts * l.scale[dimension])
 
-        l.unit = hs.geometry.copy(self.unit)
-        l.unit[axis] = l.unit[axis] + offset
-        l.unit[dimension] = length
+        local unit = hs.geometry.copy(self.unit)
+        unit[axis] = unit[axis] + offset
+        unit[dimension] = length
+
+        if l:isLeaf() and l.unit ~= unit and l:ancestorFocused() then
+            print("different unit for", l.name)
+            l.moving = true
+        end
+        l.unit = unit
         l:draw()
 
         offset = offset + length
@@ -190,13 +196,13 @@ function layout:toNode()
     end
 end
 
+-- editing
+
 function layout:split(window)
     self:toNode()
     local newLayout = layout.leaf(self.screen, window, self)
     self:add(newLayout)
 end
-
--- editing
 
 function layout:unlock()
     if self.parent then
@@ -208,7 +214,10 @@ end
 function layout:add(layout)
     self.cursor = self.cursor + 1
     table.insert(self.layouts, layout)
+    self.handler:setFocusedLayout(layout)
     layout:setFocus()
+    self.handler:draw()
+    self.handler:focus()
 end
 
 function layout:replace(layout)
@@ -244,9 +253,9 @@ function layout:swap(layout)
     selfData.parent.layouts[selfData.idx] = layout
     selfData.parent.layouts[selfData.idx].scale = selfData.scale
 
+    self.handler:setFocusedLayout(self)
     self:setFocus()
-    layout.parent:draw()
-    self.parent:draw()
+    self.handler:draw()
     self.handler:focus()
 end
 
@@ -257,29 +266,32 @@ function layout:remove(layout)
     self.cursor = math.max(idx - 1, 0)
     if self.parent then
         if #self.layouts > 1 then
+            self.handler:setFocusedLayout(self.layouts[self.cursor])
             self.layouts[self.cursor]:setFocus()
         elseif #self.layouts == 1 then
+            self.handler:setFocusedLayout(self.layouts[1])
             self.layouts[1]:replace(self)
-            self:draw()
         elseif #self.layouts == 0 then
             self.parent:remove(self)
+            return
         end
     else
         self.handler:noFocusedLayout()
-        self:draw()
     end
+    self.handler:draw()
+    self.handler:focus()
 end
 
 -- focus
 
 function layout:setFocus()
     if self.parent then
-        self.parent:focusChild(self)
+        self.parent:setFocusedChild(self)
         self.parent:setFocus()
     end
 end
 
-function layout:focusChild(layout)
+function layout:setFocusedChild(layout)
     self.cursor = self:matchingLayout(layout)
 end
 
@@ -350,9 +362,12 @@ function layout:generateHandlers(window)
     self.windowFilter = wf.new(function(w)
         return w == window
     end)
-    self.windowFilter:subscribe(wf.windowFocused, function()
-        self.handler:setFocusedLayout(self)
-        self:setFocus()
+    self.windowFilter:subscribe(wf.windowFocused, function(win)
+        if self.moving == false then
+            self.handler:setFocusedLayout(self)
+            self:setFocus()
+        end
+        self.moving = false
     end)
     self.windowFilter:subscribe(wf.windowDestroyed, function()
         self.parent:remove(self)
@@ -364,6 +379,7 @@ end
 function layout.empty(screen, handler)
     local l = setmetatable({}, layout)
     l.screen = screen
+    l.moving = false
     l.cursor = 0
     l.unit = hs.layout.maximized
     l.scale = {
@@ -375,7 +391,6 @@ function layout.empty(screen, handler)
     l.handler = handler
     l.layouts = {}
     l.window = nil
-    l.handler:setFocusedLayout(l)
     l:horizontalMode()
     return l
 end
@@ -383,6 +398,7 @@ end
 function layout.leaf(screen, window, parent)
     local l = setmetatable({}, layout)
     l.screen = screen
+    l.moving = false
     l.cursor = 0
     l.unit = hs.layout.maximized
     l.scale = {
@@ -394,7 +410,6 @@ function layout.leaf(screen, window, parent)
     l.handler = parent.handler
     l.layouts = {}
     l.window = window
-    l.handler:setFocusedLayout(l)
     l:generateHandlers(window)
     l:horizontalMode()
     return l
