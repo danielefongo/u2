@@ -59,7 +59,7 @@ hs.hotkey.bind({"cmd", "shift"}, "h", function()
     mainHandler:selected():horizontalMode()
 end)
 hs.hotkey.bind({"cmd", "shift"}, "t", function()
-    mainHandler.selectedLayout:tabbedMode()
+    mainHandler:selected():tabbedMode()
 end)
 
 hs.hotkey.bind({"cmd", "alt"}, "m", function()
