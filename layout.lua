@@ -36,10 +36,12 @@ end
 
 function layout:horizontalMode()
     self.mode = MODE.horizontal
+    self.handler:draw()
 end
 
 function layout:verticalMode()
     self.mode = MODE.vertical
+    self.handler:draw()
 end
 
 -- siblings
@@ -431,7 +433,7 @@ function layout.empty(screen, handler)
     l.handler = handler
     l.layouts = {}
     l.window = nil
-    l:horizontalMode()
+    l.mode = MODE.horizontal
     return l
 end
 
@@ -451,7 +453,7 @@ function layout.leaf(screen, window, parent)
     l.layouts = {}
     l.window = window
     l:generateHandlers(window)
-    l:horizontalMode()
+    l.mode = MODE.horizontal
     return l
 end
 
