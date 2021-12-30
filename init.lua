@@ -1,5 +1,5 @@
-local handler = require("i3.handler")
-local layout = require("i3.layout")
+local handler = require("u2.handler")
+local layout = require("u2.layout")
 
 mainHandler = handler.new()
 

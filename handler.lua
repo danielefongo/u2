@@ -2,8 +2,8 @@ local handler = {}
 handler.__index = handler
 
 local wf = require("hs.window.filter")
-local layout = require("i3.layout")
-local callbacks = require("i3.callbacks")
+local layout = require("u2.layout")
+local callbacks = require("u2.callbacks")
 local BORDER = {
     type = "rectangle",
     action = "stroke",
