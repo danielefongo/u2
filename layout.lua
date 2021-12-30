@@ -8,11 +8,6 @@ layout.__index = layout
 
 hs.window.animationDuration = 0
 
-local TITLE_EVENTS = {watcher.titleChanged}
-local DESTROY_EVENTS = {watcher.elementDestroyed}
-local MOVE_EVENTS = {watcher.windowMoved}
-local FOCUS_EVENTS = {watcher.applicationActivated, watcher.applicationDeactivated, watcher.applicationHidden,
-                      watcher.focusedWindowChanged}
 local MODE = {
     horizontal = "horizontal",
     vertical = "vertical",
@@ -301,9 +296,7 @@ end
 function layout:toNode()
     if self:isLeaf() then
         local win = self.window
-        self.destroyWatcher:stop()
-        self.moveWatcher:stop()
-        self.focusWatcher:stop()
+        self.handler.callbacks:unset(self)
         local leafLayout = layout.leaf(self.screen, win, self)
         self.window = nil
         table.insert(self.layouts, leafLayout)
@@ -494,10 +487,6 @@ end
 -- window handlers
 
 local focusedCallback = function(layout)
-    if hs.window.focusedWindow() ~= layout.window then
-        return
-    end
-
     local ancestorFocused = layout:ancestorFocused()
     if layout.moving == false and not ancestorFocused then
         layout.handler:menu()
@@ -514,10 +503,7 @@ local movedCallback = function(layout)
 end
 
 local destroyedCallback = function(layout)
-    layout.parent:remove(layout)
-end
-
-local destroyedCallback = function(layout)
+    layout.handler.callbacks:unset(layout)
     layout.parent:remove(layout)
 end
 
@@ -534,16 +520,7 @@ function layout:generateHandlers(window)
         return
     end
 
-    local isFocusedWindow = function()
-        if hs.window.focusedWindow() == window then
-            focusedCallback(self)
-        end
-    end
-
-    self.destroyWatcher = window:newWatcher(hs.fnutils.partial(destroyedCallback, self)):start(DESTROY_EVENTS)
-    self.moveWatcher = window:newWatcher(hs.fnutils.partial(movedCallback, self)):start(MOVE_EVENTS)
-    self.titleWatcher = window:newWatcher(hs.fnutils.partial(titleCallback, self)):start(TITLE_EVENTS)
-    self.focusWatcher = window:application():newWatcher(hs.fnutils.partial(focusedCallback, self)):start(FOCUS_EVENTS)
+    self.handler.callbacks:set(self, focusedCallback, movedCallback, destroyedCallback, titleCallback)
 end
 
 -- title

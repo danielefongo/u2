@@ -3,6 +3,7 @@ handler.__index = handler
 
 local wf = require("hs.window.filter")
 local layout = require("i3.layout")
+local callbacks = require("i3.callbacks")
 local BORDER = {
     type = "rectangle",
     action = "stroke",
@@ -14,6 +15,7 @@ local BORDER = {
 
 function handler.new()
     local w = setmetatable({}, handler)
+    w.callbacks = callbacks.new()
     w.selectedLayout = nil
     w.screen = hs.screen.mainScreen()
     w.wf = wf.new(function(win)
