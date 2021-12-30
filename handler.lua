@@ -72,6 +72,10 @@ function handler:focus()
     self:highlight()
 end
 
+function handler:menu()
+    self.rootLayout:menu(true)
+end
+
 function handler:selected()
     if self.selectedLayout then
         return self.selectedLayout

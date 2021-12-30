@@ -1,18 +1,22 @@
 local wf = require("hs.window.filter")
 local uid = require("i3.uid")
+local menu = require("i3.menu")
 local watcher = require("hs.uielement.watcher")
+local fnutils = require("hs.fnutils")
 local layout = {}
 layout.__index = layout
 
 hs.window.animationDuration = 0
 
+local TITLE_EVENTS = {watcher.titleChanged}
 local DESTROY_EVENTS = {watcher.elementDestroyed}
 local MOVE_EVENTS = {watcher.windowMoved}
 local FOCUS_EVENTS = {watcher.applicationActivated, watcher.applicationDeactivated, watcher.applicationHidden,
                       watcher.focusedWindowChanged}
 local MODE = {
     horizontal = "horizontal",
-    vertical = "vertical"
+    vertical = "vertical",
+    tabbed = "tabbed"
 }
 local AXIS = {
     x = "x",
@@ -50,35 +54,44 @@ function layout:verticalMode()
     self.handler:draw()
 end
 
+function layout:tabbedMode()
+    self.mode = MODE.tabbed
+    self.handler:draw()
+end
+
 -- siblings
 
 function layout:leftSibling()
     if self.parent then
-        return self:searchSibling(MODE.horizontal, -1, self.parent.leftSibling)
+        return self:searchSibling({MODE.horizontal, MODE.tabbed}, -1, self.parent.leftSibling)
     end
 end
 
 function layout:rightSibling()
     if self.parent then
-        return self:searchSibling(MODE.horizontal, 1, self.parent.rightSibling)
+        return self:searchSibling({MODE.horizontal, MODE.tabbed}, 1, self.parent.rightSibling)
     end
 end
 
 function layout:upperSibling()
     if self.parent then
-        return self:searchSibling(MODE.vertical, -1, self.parent.upperSibling)
+        return self:searchSibling({MODE.vertical}, -1, self.parent.upperSibling)
     end
 end
 
 function layout:lowerSibling()
     if self.parent then
-        return self:searchSibling(MODE.vertical, 1, self.parent.lowerSibling)
+        return self:searchSibling({MODE.vertical}, 1, self.parent.lowerSibling)
     end
 end
 
-function layout:searchSibling(mode, offset, parentSearchFun)
+function layout:searchSibling(modes, offset, parentSearchFun)
+    local found = fnutils.some(modes, function(mode)
+        return mode == self.parent.mode
+    end)
+
     local idx = self.parent:matchingLayout(self)
-    if self.parent.mode == mode and self.parent.layouts[idx + offset] then
+    if found and self.parent.layouts[idx + offset] then
         return self.parent.layouts[idx + offset]
     else
         return parentSearchFun(self.parent)
@@ -148,7 +161,73 @@ function layout:resize(layout, dimension, ratio)
     self.handler:focus()
 end
 
+-- menu
+
+function layout:setMenu(enabled)
+    self.tabMenu:destroy()
+
+    if not enabled then
+        return
+    end
+
+    local menu = {}
+    local unit = hs.geometry.copy(self.unit)
+    local menuFrame = hs.geometry.new(unit):fromUnitRect(self.screen:frame()):floor()
+    menuFrame[DIMENSION.height] = 20
+
+    for _, l in pairs(self.layouts) do
+        table.insert(menu, {
+            title = l:title(),
+            selected = l == self.layouts[self.cursor],
+            onClick = function()
+                l:setFocus()
+                l:raise()
+                l.handler:focus()
+            end
+        })
+    end
+
+    self.tabMenu:setSize(menuFrame)
+    self.tabMenu:draw(menu)
+end
+
+function layout:menuLeaf()
+    self:setMenu(false)
+end
+
+function layout:menuTiled(show)
+    self:setMenu(false)
+    for _, l in pairs(self.layouts) do
+        l:menu(show)
+    end
+end
+
+function layout:menuTabbed(show)
+    self:setMenu(show)
+    for _, l in pairs(self.layouts) do
+        l:menu(show and l == self.layouts[self.cursor])
+    end
+end
+
+function layout:menu(show)
+    if self:isLeaf() then
+        self:menuLeaf()
+    elseif self:isNode() then
+        if self.mode == MODE.tabbed then
+            self:menuTabbed(show)
+        else
+            self:menuTiled(show)
+        end
+    end
+end
+
 -- drawing utilities
+
+function layout:drawLeaf()
+    self.window:moveToScreen(self.screen)
+    self.window:moveToUnit(self.unit)
+    self.window:raise()
+end
 
 function layout:drawTiled(axis, dimension)
     local offset = 0
@@ -160,7 +239,6 @@ function layout:drawTiled(axis, dimension)
         unit[dimension] = length
 
         if l:isLeaf() and l.unit ~= unit and l:ancestorFocused() then
-            print("different unit for", l.name)
             l.moving = true
         end
         l.unit = unit
@@ -170,17 +248,39 @@ function layout:drawTiled(axis, dimension)
     end
 end
 
+function layout:drawTabbed()
+    for _, l in pairs(self.layouts) do
+        local offsetFrame = hs.geometry.new(self.unit):fromUnitRect(self.screen:frame()):floor()
+        offsetFrame[AXIS.y] = offsetFrame[AXIS.y] + 21
+        offsetFrame[DIMENSION.height] = offsetFrame[DIMENSION.height] - 21
+        l.unit = offsetFrame:toUnitRect(self.screen:frame())
+        l:draw()
+    end
+    self.layouts[self.cursor]:draw()
+end
+
 function layout:draw()
     if self:isLeaf() then
-        self.window:moveToScreen(self.screen)
-        self.window:moveToUnit(self.unit)
-        self.window:raise()
+        self:drawLeaf()
     elseif self:isNode() then
         if self.mode == MODE.horizontal then
             self:drawTiled(AXIS.x, DIMENSION.width)
         elseif self.mode == MODE.vertical then
             self:drawTiled(AXIS.y, DIMENSION.height)
+        elseif self.mode == MODE.tabbed then
+            self:drawTabbed()
         end
+    end
+end
+
+function layout:raise()
+    if self:isLeaf() then
+        self.window:raise()
+    elseif self:isNode() then
+        for _, l in pairs(self.layouts) do
+            l:raise()
+        end
+        self.layouts[self.cursor]:raise()
     end
 end
 
@@ -284,6 +384,8 @@ function layout:remove(layout)
             self.layouts[self.cursor]:setFocus()
         elseif #self.layouts == 1 then
             self.handler:setFocusedLayout(self.layouts[1])
+            self:setMenu(false)
+            self.mode = MODE.horizontal
             self.layouts[1]:replace(self)
         elseif #self.layouts == 0 then
             self.parent:remove(self)
@@ -337,6 +439,7 @@ function layout:focusSibling(finder)
     local sibling = finder(self)
     if sibling then
         sibling:setFocus()
+        sibling:raise()
         self.handler:focus()
     end
 end
@@ -397,8 +500,10 @@ local focusedCallback = function(layout)
 
     local ancestorFocused = layout:ancestorFocused()
     if layout.moving == false and not ancestorFocused then
+        layout.handler:menu()
         layout.handler:setFocusedLayout(layout)
     elseif ancestorFocused then
+        layout.handler:menu()
         layout:setFocus()
     end
     layout.moving = false
@@ -410,6 +515,14 @@ end
 
 local destroyedCallback = function(layout)
     layout.parent:remove(layout)
+end
+
+local destroyedCallback = function(layout)
+    layout.parent:remove(layout)
+end
+
+local titleCallback = function(layout)
+    layout.handler:menu()
 end
 
 local matchWindow = function(referredWindow, window)
@@ -429,7 +542,20 @@ function layout:generateHandlers(window)
 
     self.destroyWatcher = window:newWatcher(hs.fnutils.partial(destroyedCallback, self)):start(DESTROY_EVENTS)
     self.moveWatcher = window:newWatcher(hs.fnutils.partial(movedCallback, self)):start(MOVE_EVENTS)
+    self.titleWatcher = window:newWatcher(hs.fnutils.partial(titleCallback, self)):start(TITLE_EVENTS)
     self.focusWatcher = window:application():newWatcher(hs.fnutils.partial(focusedCallback, self)):start(FOCUS_EVENTS)
+end
+
+-- title
+
+function layout:title()
+    if self:isRoot() then
+        return "Root"
+    elseif self:isLeaf() then
+        return self.window:application():name() .. " - " .. self.window:title()
+    else
+        return ""
+    end
 end
 
 -- constructors
@@ -447,6 +573,7 @@ function layout.empty(screen, handler)
     l.parent = nil
     l.name = uid.next()
     l.handler = handler
+    l.tabMenu = menu.new()
     l.layouts = {}
     l.window = nil
     l.mode = MODE.horizontal
@@ -466,6 +593,7 @@ function layout.leaf(screen, window, parent)
     l.parent = parent
     l.name = uid.next()
     l.handler = parent.handler
+    l.tabMenu = menu.new()
     l.layouts = {}
     l.window = window
     l:generateHandlers(window)
