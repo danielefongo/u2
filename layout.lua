@@ -186,6 +186,10 @@ function layout:isNode()
     return (self.window == nil and self.layouts ~= {})
 end
 
+function layout:isRoot()
+    return (self.parent == nil)
+end
+
 function layout:toNode()
     if self:isLeaf() then
         local win = self.window
@@ -327,6 +331,28 @@ function layout:focusSibling(finder)
     end
 end
 
+function layout:focusParent()
+    if self.parent then
+        self.handler:setFocusedLayout(self.parent)
+    end
+end
+
+function layout:focusChild()
+    if self:isNode() then
+        self.handler:setFocusedLayout(self.layouts[self.cursor])
+    end
+end
+
+function layout:ancestorFocused()
+    if self == self.handler:selected() then
+        return true
+    elseif self.parent then
+        return self.parent:ancestorFocused()
+    else
+        return false
+    end
+end
+
 -- swap
 
 function layout:swapLeft()
@@ -354,24 +380,38 @@ end
 
 -- window handlers
 
+local focusedCallback = function(layout)
+    local ancestorFocused = layout:ancestorFocused()
+    if layout.moving == false and not ancestorFocused then
+        layout.handler:setFocusedLayout(layout)
+    elseif ancestorFocused then
+        layout:setFocus()
+    end
+    layout.moving = false
+end
+
+local movedCallback = function(layout)
+    layout.moving = false
+end
+
+local destroyedCallback = function(layout)
+    layout.parent:remove(layout)
+end
+
+local matchWindow = function(referredWindow, window)
+    return referredWindow == window
+end
+
 function layout:generateHandlers(window)
     if self:isNode() then
         return
     end
 
-    self.windowFilter = wf.new(function(w)
-        return w == window
-    end)
-    self.windowFilter:subscribe(wf.windowFocused, function(win)
-        if self.moving == false then
-            self.handler:setFocusedLayout(self)
-            self:setFocus()
-        end
-        self.moving = false
-    end)
-    self.windowFilter:subscribe(wf.windowDestroyed, function()
-        self.parent:remove(self)
-    end)
+    self.windowFilter = wf.new(hs.fnutils.partial(matchWindow, window))
+    self.windowFilter:subscribe(wf.windowFocused, hs.fnutils.partial(focusedCallback, self))
+    self.windowFilter:subscribe(wf.windowCreated, hs.fnutils.partial(focusedCallback, self))
+    self.windowFilter:subscribe(wf.windowMoved, hs.fnutils.partial(movedCallback, self))
+    self.windowFilter:subscribe(wf.windowDestroyed, hs.fnutils.partial(destroyedCallback, self))
 end
 
 -- constructors
