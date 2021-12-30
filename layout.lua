@@ -41,17 +41,17 @@ end
 
 function layout:horizontalMode()
     self.mode = MODE.horizontal
-    self.handler:draw()
+    self:draw()
 end
 
 function layout:verticalMode()
     self.mode = MODE.vertical
-    self.handler:draw()
+    self:draw()
 end
 
 function layout:tabbedMode()
     self.mode = MODE.tabbed
-    self.handler:draw()
+    self:draw()
 end
 
 -- siblings
