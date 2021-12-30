@@ -1,9 +1,15 @@
 local wf = require("hs.window.filter")
 local uid = require("i3.uid")
+local watcher = require("hs.uielement.watcher")
 local layout = {}
 layout.__index = layout
 
 hs.window.animationDuration = 0
+
+local DESTROY_EVENTS = {watcher.elementDestroyed}
+local MOVE_EVENTS = {watcher.windowMoved}
+local FOCUS_EVENTS = {watcher.applicationActivated, watcher.applicationDeactivated, watcher.applicationHidden,
+                      watcher.focusedWindowChanged}
 local MODE = {
     horizontal = "horizontal",
     vertical = "vertical"
@@ -195,7 +201,9 @@ end
 function layout:toNode()
     if self:isLeaf() then
         local win = self.window
-        self.windowFilter:unsubscribeAll()
+        self.destroyWatcher:stop()
+        self.moveWatcher:stop()
+        self.focusWatcher:stop()
         local leafLayout = layout.leaf(self.screen, win, self)
         self.window = nil
         table.insert(self.layouts, leafLayout)
@@ -383,6 +391,10 @@ end
 -- window handlers
 
 local focusedCallback = function(layout)
+    if hs.window.focusedWindow() ~= layout.window then
+        return
+    end
+
     local ancestorFocused = layout:ancestorFocused()
     if layout.moving == false and not ancestorFocused then
         layout.handler:setFocusedLayout(layout)
@@ -409,11 +421,15 @@ function layout:generateHandlers(window)
         return
     end
 
-    self.windowFilter = wf.new(hs.fnutils.partial(matchWindow, window))
-    self.windowFilter:subscribe(wf.windowFocused, hs.fnutils.partial(focusedCallback, self))
-    self.windowFilter:subscribe(wf.windowCreated, hs.fnutils.partial(focusedCallback, self))
-    self.windowFilter:subscribe(wf.windowMoved, hs.fnutils.partial(movedCallback, self))
-    self.windowFilter:subscribe(wf.windowDestroyed, hs.fnutils.partial(destroyedCallback, self))
+    local isFocusedWindow = function()
+        if hs.window.focusedWindow() == window then
+            focusedCallback(self)
+        end
+    end
+
+    self.destroyWatcher = window:newWatcher(hs.fnutils.partial(destroyedCallback, self)):start(DESTROY_EVENTS)
+    self.moveWatcher = window:newWatcher(hs.fnutils.partial(movedCallback, self)):start(MOVE_EVENTS)
+    self.focusWatcher = window:application():newWatcher(hs.fnutils.partial(focusedCallback, self)):start(FOCUS_EVENTS)
 end
 
 -- constructors
