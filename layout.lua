@@ -42,16 +42,19 @@ end
 function layout:horizontalMode()
     self.mode = MODE.horizontal
     self:draw()
+    self.handler:menu()
 end
 
 function layout:verticalMode()
     self.mode = MODE.vertical
     self:draw()
+    self.handler:menu()
 end
 
 function layout:tabbedMode()
     self.mode = MODE.tabbed
     self:draw()
+    self.handler:menu()
 end
 
 -- siblings
