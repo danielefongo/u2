@@ -107,6 +107,7 @@ function menu:draw(opts)
         end)
     end
 
+    self.canvas:level(100)
     self.canvas:show()
 end
 
